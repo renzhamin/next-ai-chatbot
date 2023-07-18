@@ -30,7 +30,7 @@ function buildOpenAssistantPrompt(
 
 const ratelimit = new Ratelimit({
   redis: redis,
-  limiter: Ratelimit.slidingWindow(2, '1 d')
+  limiter: Ratelimit.slidingWindow(15, '1 d')
 })
 
 export async function POST(req: Request) {
