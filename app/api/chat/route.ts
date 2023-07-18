@@ -4,7 +4,8 @@ import { nanoid } from '@/lib/utils'
 
 import { HfInference } from '@huggingface/inference'
 import { HuggingFaceStream, StreamingTextResponse } from 'ai'
-
+import { redis } from '@/lib/redis'
+import { Ratelimit } from '@upstash/ratelimit'
 import { NextRequest } from 'next/server'
 // Create a new Hugging Face Inference instance
 const Hf = new HfInference(process.env.HUGGINGFACE_API_KEY)
@@ -27,6 +28,11 @@ function buildOpenAssistantPrompt(
   )
 }
 
+const ratelimit = new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(2, '1 d')
+})
+
 export async function POST(req: Request) {
   const json = await req.json()
   const userId = (await auth()).user?.id
@@ -35,6 +41,15 @@ export async function POST(req: Request) {
     return new Response('Unauthorized', {
       status: 401
     })
+  }
+
+  const { success, reset } = await ratelimit.limit(userId)
+  if (!success) {
+    return new Response(
+      `Your rate limit has been exceeded. You can chat again from ${new Date(
+        reset
+      ).toLocaleString()} GMT`
+    )
   }
 
   const { messages } = json
